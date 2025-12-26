@@ -16,8 +16,8 @@ start_time = time.time()
 start_memory = get_process_memory()
 
 
-env = gym.make('Taxi-v3') # Create the Taxi environment
-# env = gym.make('Taxi-v3', render_mode='human') #Uncomment to visualize the environment
+env = gym.make('CartPole-v1') # Create the Taxi environment
+# env = gym.make('CartPole-v1', render_mode='human') #Uncomment to visualize the environment
 
 alpha = 0.9
 gamma = 0.95
@@ -86,7 +86,7 @@ print(f"   - Active Threads:    {num_threads}")
 print("="*40 + "\n")
 
 
-env = gym.make('Taxi-v3', render_mode='human')
+env = gym.make('CartPole-v1', render_mode='human')
 
 for episode in range(5):
     state, info = env.reset()
