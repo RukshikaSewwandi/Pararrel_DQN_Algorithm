@@ -24,7 +24,7 @@ gamma = 0.95
 epsilon = 1.0
 epsilon_decay = 0.9995
 min_epsilon = 0.01
-num_episodes = 10000
+num_episodes = 20000
 max_steps = 100
 
 
