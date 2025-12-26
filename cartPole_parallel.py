@@ -154,7 +154,7 @@ if __name__ == "__main__":
     print("="*40)
     print(f"1. Execution Time:      {execution_time:.4f} seconds")
     print(f"2. Workers:             {NUM_WORKERS}")
-    print("="*40 + "\n")
+    print("="*45 + "\n")
     
     # --- VISUALIZATION (Optional) ---
     env = gym.make('CartPole-v1', render_mode='human')
@@ -171,4 +171,4 @@ if __name__ == "__main__":
             next_state, _, done, _, _ = env.step(action)
             state_idx = get_discrete_state_idx(next_state, lower_bounds, upper_bounds)
             if done: break
-    #env.close()
+    env.close()
