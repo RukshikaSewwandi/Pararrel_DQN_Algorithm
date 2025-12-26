@@ -2,8 +2,8 @@ import random
 import gymnasium as gym
 import numpy as np
 
-
-env = gym.make('Taxi-v3', render_mode='human')
+env = gym.make('Taxi-v3') # Create the Taxi environment
+# env = gym.make('Taxi-v3', render_mode='human') #Uncomment to visualize the environment
 
 alpha = 0.9
 gamma = 0.95
@@ -30,7 +30,7 @@ for episode in range(num_episodes):
     done = False
 
     for step in range(max_steps):
-        env.render()
+        #env.render() # Uncomment to visualize training
         action = choose_action(state)
 
         next_state, reward, done, turncated, info = env.step(action)
