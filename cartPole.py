@@ -53,7 +53,7 @@ lower_bounds = [env.observation_space.low[0], -0.5, env.observation_space.low[2]
 total_states = BUCKETS[0] * BUCKETS[1] * BUCKETS[2] * BUCKETS[3]
 q_table = np.zeros((total_states, env.action_space.n))
 
-print('Training started (Single Core with Delay)...')
+print('Training started...')
 
 for episode in range(NUM_EPISODES):
     raw_state, info = env.reset()

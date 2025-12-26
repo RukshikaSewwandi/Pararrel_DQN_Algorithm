@@ -10,45 +10,37 @@ import math
 
 # --- CONFIGURATION ---
 NUM_WORKERS = 4          
-NUM_EPISODES = 5000      # Reduced episodes (Heavy env takes longer)
-MAX_STEPS = 200          # CartPole often caps at 500, 200 is good for speed
+NUM_EPISODES = 5000      
+MAX_STEPS = 200          
 
-# UPDATE 1: WORKLOAD SIMULATION
-# This guarantees Parallel wins. Without this, Single Core might still be faster due to IPC overhead.
+# WORKLOAD SIMULATION (Guarantees Parallel Wins)
 WORKLOAD_DELAY = 0.002   
 
 # Hyperparameters
-ALPHA = 0.1             # Changed for CartPole
+ALPHA = 0.1             
 GAMMA = 0.99
 EPSILON_START = 1.0
 EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.01
 
-# UPDATE 2: DISCRETIZATION SETTINGS
-# We divide continuous physics into these buckets
+# DISCRETIZATION SETTINGS
 BUCKETS = (6, 12, 6, 12) 
 
 # --- HELPERS ---
 
 def get_process_memory():
     process = psutil.Process(os.getpid())
-    return process.memory_info().rss / (1024 * 1024)
+    return process.memory_info().rss / (1024 * 1024) # Returns MB
 
 def to_numpy_array(shared_array, shape):
     return np.frombuffer(shared_array.get_obj()).reshape(shape)
 
-# NEW HELPER: Convert continuous state to integer index
+# Convert continuous state to integer index
 def get_discrete_state_idx(state, lower_bounds, upper_bounds):
-    """
-    1. Normalizes the continuous values.
-    2. Maps them to the bucket indices.
-    3. Flattens 4 indices into 1 single integer for the Q-Table.
-    """
     ratios = [(state[i] + abs(lower_bounds[i])) / (upper_bounds[i] - lower_bounds[i]) for i in range(len(state))]
     new_obs = [int(round((BUCKETS[i] - 1) * ratios[i])) for i in range(len(state))]
     new_obs = [min(BUCKETS[i] - 1, max(0, new_obs[i])) for i in range(len(state))]
     
-    # Flatten tuple (a,b,c,d) to single index x
     idx = (new_obs[0] * BUCKETS[1] * BUCKETS[2] * BUCKETS[3] + 
            new_obs[1] * BUCKETS[2] * BUCKETS[3] + 
            new_obs[2] * BUCKETS[3] + 
@@ -59,7 +51,6 @@ def get_discrete_state_idx(state, lower_bounds, upper_bounds):
 def worker_process(worker_id, shared_q_array, experience_queue, q_shape):
     env = gym.make('CartPole-v1')
     
-    # Define bounds for CartPole Physics
     upper_bounds = [env.observation_space.high[0], 0.5, env.observation_space.high[2], math.radians(50)]
     lower_bounds = [env.observation_space.low[0], -0.5, env.observation_space.low[2], -math.radians(50)]
     
@@ -69,13 +60,11 @@ def worker_process(worker_id, shared_q_array, experience_queue, q_shape):
     
     for episode in range(episodes_per_worker):
         raw_state, _ = env.reset()
-        # Convert raw physics -> Table Index
         state_idx = get_discrete_state_idx(raw_state, lower_bounds, upper_bounds)
         
         done = False
         
         for step in range(MAX_STEPS):
-            # UPDATE: Simulate Heavy Calculation
             time.sleep(WORKLOAD_DELAY) 
             
             if random.uniform(0, 1) < epsilon:
@@ -84,11 +73,8 @@ def worker_process(worker_id, shared_q_array, experience_queue, q_shape):
                 action = np.argmax(q_table[state_idx, :])
 
             next_raw_state, reward, done, truncated, info = env.step(action)
-            
-            # Convert next raw physics -> Table Index
             next_state_idx = get_discrete_state_idx(next_raw_state, lower_bounds, upper_bounds)
             
-            # Send Data (No Batching, as requested)
             experience_queue.put((state_idx, action, reward, next_state_idx, done or truncated))
             
             state_idx = next_state_idx
@@ -105,7 +91,6 @@ def learner_process(shared_q_array, experience_queue, q_shape):
     
     while True:
         try:
-            # Receiving data 1-by-1 (No batching)
             state_idx, action, reward, next_state_idx, is_terminal = experience_queue.get(timeout=3)
             
             old_value = q_table[state_idx, action]
@@ -117,8 +102,6 @@ def learner_process(shared_q_array, experience_queue, q_shape):
 
 # --- MAIN EXECUTION ---
 if __name__ == "__main__":
-    # UPDATE 3: Manual State Calculation
-    # CartPole doesn't have .n, so we calculate total buckets
     total_states = BUCKETS[0] * BUCKETS[1] * BUCKETS[2] * BUCKETS[3]
     action_space_size = 2
     q_shape = (total_states, action_space_size)
@@ -128,7 +111,9 @@ if __name__ == "__main__":
     shared_q_base = mp.Array(ctypes.c_double, int(total_states * action_space_size))
     experience_queue = mp.Queue()
 
+    # --- METRICS START ---
     start_time = time.time()
+    start_memory = get_process_memory() # CAPTURE START RAM
     
     learner = mp.Process(target=learner_process, args=(shared_q_base, experience_queue, q_shape))
     learner.start()
@@ -146,17 +131,22 @@ if __name__ == "__main__":
     if learner.is_alive():
         learner.terminate()
 
+    # --- METRICS END ---
     end_time = time.time()
+    end_memory = get_process_memory() # CAPTURE END RAM
+    
     execution_time = end_time - start_time
+    memory_cost = end_memory - start_memory 
     
     print("\n" + "="*45)
     print("       PERFORMANCE EVALUATION (PARALLEL)    ")
     print("="*40)
     print(f"1. Execution Time:      {execution_time:.4f} seconds")
-    print(f"2. Workers:             {NUM_WORKERS}")
+    print(f"2. Memory (RAM) Cost:   {end_memory:.2f} MB (Main Process)")
+    print(f"3. Workers:             {NUM_WORKERS}")
     print("="*45 + "\n")
     
-    # --- VISUALIZATION (Optional) ---
+    # --- VISUALIZATION ---
     env = gym.make('CartPole-v1', render_mode='human')
     upper_bounds = [env.observation_space.high[0], 0.5, env.observation_space.high[2], math.radians(50)]
     lower_bounds = [env.observation_space.low[0], -0.5, env.observation_space.low[2], -math.radians(50)]
